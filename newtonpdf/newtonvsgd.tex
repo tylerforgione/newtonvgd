@@ -1,0 +1,99 @@
+\documentclass[conference]{IEEEtran}
+
+\usepackage{subfig}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{subcaption}
+\usepackage{hyperref}
+
+\title{Newton's Method as an Optimization Algorithm for Machine Learning}
+
+\author{
+    \IEEEauthorblockN{Tyler Forgione}
+}
+
+\date{}
+
+\bibliographystyle{IEEEtran}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+    placeholder
+\end{abstract}
+
+\section{Introduction}
+
+It is common practice to use Gradient Descent and its variants, such as Stochastic Gradient Descent (SGD) for optimization in machine learning \cite{bottou_1991}. SGD is a first-order optimization algorithm that iteratively updates a model's parameters with respect to a single training example.
+
+\begin{equation}
+    \theta_{t+1} = \theta_t - \eta \nabla_\theta J(\theta; x_i, y_i)
+    \label{eq:sgd}
+\end{equation}
+
+In contrast, Batch Gradient Descent computes the gradient using the entire training set at each iteration.
+
+\begin{equation}
+    \theta_{t+1} = \theta_t - \eta \nabla_\theta J(\theta)
+    \label{eq:bgd}
+\end{equation}
+
+While BGD can be computationally expensive for large datasets, it provides a more accurate estimate of the gradient, which can lead to faster convergence. On the other hand, SGD is computationally efficient and can converge faster than BGD in practice, especially for large datasets. However, SGD can be noisy and may require careful tuning of hyperparameters such as learning rate to achieve good performance \cite{DBLP:journals/corr/Ruder16}. In the final case, a middle ground approach called Mini-Batch Gradient Descent is often used, which computes the gradient using a small subset of the training data at each iteration.
+
+\begin{equation}
+    \theta_{t+1} = \theta_t - \eta \nabla_\theta J(\theta; x_{i:i+n}, y_{i:i+n})
+    \label{eq:mbgd}
+\end{equation}
+
+In general, these optimization algorithms each have their use cases. However, a key hyperparameter in gradient descent is the number of epochs, which is the number of times the entire training dataset is passed through the model. Choosing an appropriate number of epochs is crucial for achieving good performance, as too few epochs may lead to underfitting, while too many epochs may lead to overfitting. Essentially, going too far in the optimization process can lead to passing the optimum point and diverging from the solution.
+
+Gradient Descent has, over time, led to the leaving behind of Newton's Method. Newton's Method is a second-order optimization algorithm that uses the Hessian matrix to compute the update step \cite{POLYAK20071086}. The update step for Newton's Method is given by:
+
+\begin{equation}
+    \theta_{t+1} = \theta_t - H^{-1} \nabla_\theta J(\theta)
+    \label{eq:newton}
+\end{equation}
+
+The use of the Hessian allows the algorithm to incorporate curvature information of the loss function, often resulting in significantly faster convergence compared to first-order methods. In the special case where the objective function is quadratic, Newton’s method converges to the global optimum in a single iteration. This follows from the fact that quadratic functions are exactly represented by their second-order Taylor expansion, which Newton’s method minimizes at each step.
+
+However, in machine learning applications, such as logistic regression, the loss function is not quadratic though it may be convex. In this case, Newton's method may not converge in a single step, but can benefit from rapid convergence in the vicinity of the optimum.
+
+A logistic regression typically uses Cross-Entropy (CE) loss \cite{mithra_noel_banerjee_amali_muthiah-nakarajan_2023}, given by the following equation:
+
+\begin{equation}
+    J(\theta) = -\frac{1}{m} \sum_{i=1}^{m} \left[ y_i \log(h_\theta(x_i)) + (1 - y_i) \log(1 - h_\theta(x_i)) \right]
+    \label{eq:ce_loss}
+\end{equation}
+
+where \( h_\theta(x_i) \) is the sigmoid function applied to the linear combination of inputs and parameters, defined as:
+
+\begin{equation}
+    h_\theta(x_i) = \frac{1}{1 + e^{-\theta^T x_i}}
+    \label{eq:sigmoid}
+\end{equation}
+
+The biggest disadvantage of Newton's method is that it requires the computation of the Hessian matrix, which can be computationally expensive and memory-intensive for high-dimensional problems. Furthermore, Newton's Method requires the Hessian to be invertible, and it is preferable that it is positive definite, especially near the optimum \cite{nocedal_springer_2006}. SGD does not have these requirements and can be more robust in practice, especially for non-convex optimization problems commonly encountered in deep learning.
+
+For a logistic regression, the gradient of the loss function is
+
+\begin{equation}
+    \nabla_\theta J(\theta) = \frac{1}{m} X^T (h_\theta(X) - y)
+    \label{eq:gradient}
+\end{equation}
+
+and the Hessian matrix is given by
+
+\begin{equation}
+    H = \frac{1}{m} X^T R X
+    \label{eq:hessian}
+\end{equation}
+
+where \( R \) is a diagonal matrix with entries \( h_\theta(x_i)(1 - h_\theta(x_i)) \). The Hessian is positive semidefinite, which ensures that the loss function is convex and that Newton's method will converge to a global minimum.
+
+\bibliography{ref}
+
+\end{document}

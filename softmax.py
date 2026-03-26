@@ -11,18 +11,22 @@ class SoftmaxRegression:
         expZ = np.exp(Z)
         return expZ / np.sum(expZ, axis=1, keepdims=True)
 
-    def loss(self, X, y):
+    def loss(self, X, y, lamb=0.0):
         Z = X @ self.weights
         P = self.softmax(Z)
         eps = 1e-12
-        return -np.mean(np.sum(y * np.log(P + eps), axis=1))
+        data_loss = -np.mean(np.sum(y * np.log(P + eps), axis=1))
+        regularization_loss = 0.5 *  lamb * np.sum(self.weights[1:] ** 2)
+        return data_loss + regularization_loss
 
-    def gradient(self, X, y):
+    def gradient(self, X, y, lamb=0.0):
         Z = X @ self.weights
         P = self.softmax(Z)
-        return X.T @ (P - y) / y.shape[0]
+        grad = X.T @ (P - y) / y.shape[0]
+        grad[1:] += lamb * self.weights[1:]
+        return grad
 
-    def hessian_vector_product(self, X, v):
+    def hessian_vector_product(self, X, v, lamb=0.0):
         Z = X @ self.weights
         P = self.softmax(Z)
 
@@ -30,9 +34,13 @@ class SoftmaxRegression:
 
         S = P * Xv
         S -= P * np.sum(S, axis=1, keepdims=True)
-        return X.T @ S / X.shape[0]
 
-    def fit(self, X, y, X_val, y_val, method='gd', epochs=100, lr=0.1, batch_size=None):
+        v_reg = v.copy()
+        v_reg[0] = 0
+
+        return X.T @ S / X.shape[0] + lamb * v_reg
+
+    def fit(self, X, y, X_val, y_val, method='gd', epochs=100, lr=0.1, batch_size=None, lamb=0.0):
         train_accs = []
         train_losses = []
         val_accs = []
@@ -60,17 +68,17 @@ class SoftmaxRegression:
                         end = min(start + batch_size, n)
                         X_batch = X_shuffled[start:end]
                         y_batch = y_shuffled[start:end]
-                        grad = self.gradient(X_batch, y_batch)
+                        grad = self.gradient(X_batch, y_batch, lamb=lamb)
                         self.weights -= lr * grad
                 else:
-                    grad = self.gradient(X, y)
+                    grad = self.gradient(X, y, lamb=lamb)
                     self.weights -= lr * grad
 
             elif method == 'cg':
-                grad = self.gradient(X, y)
+                grad = self.gradient(X, y, lamb=lamb)
                 def Hv(v_flat):
                     v = v_flat.reshape(d, K)
-                    Hv_mat = self.hessian_vector_product(X, v)
+                    Hv_mat = self.hessian_vector_product(X, v, lamb=lamb)
                     return Hv_mat.ravel() + 1e-6 * v_flat
 
                 H_op = sp.sparse.linalg.LinearOperator((d * K, d * K), matvec=Hv)
@@ -78,9 +86,11 @@ class SoftmaxRegression:
                 step, info = sp.sparse.linalg.cg(H_op, grad_flat, maxiter=50)
                 step = step.reshape(d, K)
                 self.weights -= step
+                if info > 0:
+                    print("CG did not fully converge:", info)
 
             # training stuff
-            loss = self.loss(X, y)
+            loss = self.loss(X, y, lamb=lamb)
             preds = self.predict(X[:, 1:])
             y_labels = np.argmax(y, axis=1)
             acc = np.mean(preds == y_labels)
@@ -88,7 +98,7 @@ class SoftmaxRegression:
             train_losses.append(loss)
 
             # validation stuff
-            loss = self.loss(X_val, y_val)
+            loss = self.loss(X_val, y_val, lamb=lamb)
             preds = self.predict(X_val[:, 1:])
             y_labels = np.argmax(y_val, axis=1)
             acc = np.mean(preds == y_labels)
