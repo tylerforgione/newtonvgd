@@ -9,17 +9,6 @@ import time
 from itertools import product
 
 
-def sklearn_to_df(data_loader):
-    X_data = data_loader.data
-    X_columns = data_loader.feature_names
-    x = pd.DataFrame(X_data, columns=X_columns)
-
-    y_data = data_loader.target
-    y = pd.Series(y_data, name='target')
-
-    return x, y
-
-
 def run_logreg(x_train, y_train, x_val, y_val, x_eval, y_eval, method='gd', epochs=1000, lr=0.0001, batch_size=None):
     logreg = LogisticRegression()
     print("Training logistic regression using", method)
@@ -30,7 +19,9 @@ def run_logreg(x_train, y_train, x_val, y_val, x_eval, y_eval, method='gd', epoc
     print("Val accuracy: ", logreg.score(x_eval, y_eval))
     return logreg, metrics, logreg.score(x_eval, y_eval)
 
-def run_softmax(x_train, y_train, x_val, y_val, x_eval, y_eval, method='gd', epochs=1000, lr=0.0001, batch_size=None, lamb=0.0):
+
+def run_softmax(x_train, y_train, x_val, y_val, x_eval, y_eval, method='gd', epochs=1000, lr=0.0001, batch_size=None,
+                lamb=0.0):
     softmax = SoftmaxRegression()
     print("Training softmax regression using", method)
     start = time.time()
@@ -41,13 +32,14 @@ def run_softmax(x_train, y_train, x_val, y_val, x_eval, y_eval, method='gd', epo
     print("Val accuracy: ", acc)
     return softmax, metrics, acc
 
+
 def grid_search_softmax(
-    x_train, y_train, x_val, y_val,
-    method='gd',
-    epochs_range=None,
-    lr_range=None,
-    batch_size_range=None,
-    lambda_range=None,
+        x_train, y_train, x_val, y_val,
+        method='gd',
+        epochs_range=None,
+        lr_range=None,
+        batch_size_range=None,
+        lambda_range=None,
 ):
     best_val_acc = 0.0
     best_params = None
@@ -91,7 +83,6 @@ def grid_search_softmax(
                 }
             best_model = model
 
-
     return best_model, best_params, best_val_acc
 
 
@@ -120,16 +111,19 @@ def main():
     lr_range = [1e-4, 5e-4, 1e-3, 5e-3]
     batch_size_range = [32, 64, 128]
     lambda_range = [0, 1e-5, 1e-4, 1e-3, 1e-2]
-    best_model, best_params, best_val_acc = grid_search_softmax(x_train, y_train, x_val, y_val, 'gd', epochs_range, lr_range, batch_size_range, lambda_range)
+    best_model, best_params, best_val_acc = grid_search_softmax(x_train, y_train, x_val, y_val, 'gd', epochs_range,
+                                                                lr_range, batch_size_range, lambda_range)
     print('Best parameters:', best_params)
     print('Best validation accuracy:', best_val_acc)
     print('Score on test set:', best_model.score(x_test, y_test))
 
     lambda_range = [0, 1e-5, 1e-4, 1e-3, 1e-2]
-    best_model, best_params, best_val_acc = grid_search_softmax(x_train, y_train, x_val, y_val, 'cg', epochs_range=range(1,10), lambda_range=lambda_range)
+    best_model, best_params, best_val_acc = grid_search_softmax(x_train, y_train, x_val, y_val, 'cg',
+                                                                epochs_range=range(1, 10), lambda_range=lambda_range)
     print('Best parameters:', best_params)
     print('Best validation accuracy:', best_val_acc)
     print('Score on test set:', best_model.score(x_test, y_test))
+
 
 if __name__ == '__main__':
     main()

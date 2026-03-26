@@ -85,6 +85,7 @@ class LogisticRegression:
 
             elif method == 'cg':
                 grad = self.gradient(X, y)
+
                 def Hv(v):
                     return self.hessian_vector_product(X, v) + 1e-6 * v
 

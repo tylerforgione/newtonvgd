@@ -1,6 +1,8 @@
 import numpy as np
 import scipy as sp
 
+np.random.seed(17)
+
 
 class SoftmaxRegression:
     def __init__(self):
@@ -16,7 +18,7 @@ class SoftmaxRegression:
         P = self.softmax(Z)
         eps = 1e-12
         data_loss = -np.mean(np.sum(y * np.log(P + eps), axis=1))
-        regularization_loss = 0.5 *  lamb * np.sum(self.weights[1:] ** 2)
+        regularization_loss = 0.5 * lamb * np.sum(self.weights[1:] ** 2)
         return data_loss + regularization_loss
 
     def gradient(self, X, y, lamb=0.0):
@@ -73,6 +75,7 @@ class SoftmaxRegression:
 
             elif method == 'cg':
                 grad = self.gradient(X, y, lamb=lamb)
+
                 def Hv(v_flat):
                     v = v_flat.reshape(d, K)
                     Hv_mat = self.hessian_vector_product(X, v, lamb=lamb)
