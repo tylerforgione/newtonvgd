@@ -1,0 +1,5 @@
+numpy
+pandas
+scipy
+scipy-stubs
+scikit-learn
