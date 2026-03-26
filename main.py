@@ -20,25 +20,79 @@ def sklearn_to_df(data_loader):
     return x, y
 
 
-def run_logreg(x_train, y_train, x_val, y_val, x_test, y_test, method='gd', epochs=1000, lr=0.0001, batch_size=None):
+def run_logreg(x_train, y_train, x_val, y_val, x_eval, y_eval, method='gd', epochs=1000, lr=0.0001, batch_size=None):
     logreg = LogisticRegression()
     print("Training logistic regression using", method)
     start = time.time()
     metrics = logreg.fit(x_train, y_train, x_val, y_val, method, epochs, lr, batch_size)
     end = time.time()
     print("Training time: ", end - start)
-    print("Val accuracy: ", logreg.score(x_test, y_test))
-    return logreg, metrics, logreg.score(x_test, y_test)
+    print("Val accuracy: ", logreg.score(x_eval, y_eval))
+    return logreg, metrics, logreg.score(x_eval, y_eval)
 
-def run_softmax(x_train, y_train, x_val, y_val, x_test, y_test, method='gd', epochs=1000, lr=0.0001, batch_size=None, lamb=0.0):
+def run_softmax(x_train, y_train, x_val, y_val, x_eval, y_eval, method='gd', epochs=1000, lr=0.0001, batch_size=None, lamb=0.0):
     softmax = SoftmaxRegression()
     print("Training softmax regression using", method)
     start = time.time()
     metrics = softmax.fit(x_train, y_train, x_val, y_val, method, epochs, lr, batch_size, lamb)
     end = time.time()
     print("Training time: ", end - start)
-    print("Val accuracy: ", softmax.score(x_test, y_test))
-    return softmax, metrics, softmax.score(x_test, y_test)
+    acc = softmax.score(x_eval, y_eval)
+    print("Val accuracy: ", acc)
+    return softmax, metrics, acc
+
+def grid_search_softmax(
+    x_train, y_train, x_val, y_val,
+    method='gd',
+    epochs_range=None,
+    lr_range=None,
+    batch_size_range=None,
+    lambda_range=None,
+):
+    best_val_acc = 0.0
+    best_params = None
+    best_model = None
+
+    if method == 'gd':
+        param_grid = product(epochs_range, lr_range, batch_size_range, lambda_range)
+    elif method == 'cg':
+        param_grid = product(epochs_range, [None], [None], lambda_range)
+    else:
+        raise ValueError('Unknown method')
+
+    for epochs, lr, batch_size, lamb in param_grid:
+        if method == 'gd':
+            print(f"epochs={epochs}, lr={lr}, batch={batch_size}, lambda={lamb}")
+        elif method == 'cg':
+            print(f"epochs={epochs}, lambda={lamb}")
+
+        model, _, val_acc = run_softmax(
+            x_train, y_train, x_val, y_val, x_val, y_val,
+            method=method,
+            epochs=epochs,
+            lr=lr,
+            batch_size=batch_size,
+            lamb=lamb
+        )
+
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            if method == 'gd':
+                best_params = {
+                    'epochs': epochs,
+                    'lr': lr,
+                    'batch_size': batch_size,
+                    'lamb': lamb
+                }
+            elif method == 'cg':
+                best_params = {
+                    'epochs': epochs,
+                    'lamb': lamb
+                }
+            best_model = model
+
+
+    return best_model, best_params, best_val_acc
 
 
 def main():
@@ -66,40 +120,16 @@ def main():
     lr_range = [1e-4, 5e-4, 1e-3, 5e-3]
     batch_size_range = [32, 64, 128]
     lambda_range = [0, 1e-5, 1e-4, 1e-3, 1e-2]
-    best_val_acc = 0.0
-    best_params = None
-    best_model = None
-    for epochs, lr, batch_size, lamb in product(epochs_range, lr_range, batch_size_range, lambda_range):
-        print("\nnumber of epochs:",epochs, ", learning rate:", lr, ", batch size:", batch_size, ", lambda:", lamb)
-        model, _, val_acc = run_softmax(x_train, y_train, x_val, y_val, x_val, y_val, method='gd', epochs=epochs, lr=lr,
-                                        batch_size=batch_size, lamb=lamb)
-        if val_acc > best_val_acc:
-            best_val_acc = val_acc
-            best_params = {'epochs': epochs, 'lr': lr, 'batch_size': batch_size, 'lamb': lamb}
-            best_model = model
+    best_model, best_params, best_val_acc = grid_search_softmax(x_train, y_train, x_val, y_val, 'gd', epochs_range, lr_range, batch_size_range, lambda_range)
+    print('Best parameters:', best_params)
+    print('Best validation accuracy:', best_val_acc)
+    print('Score on test set:', best_model.score(x_test, y_test))
 
-    print("\nBest validation accuracy:", best_val_acc)
-    print("Best parameters:", best_params)
-    print("Trying best model on test set")
-    print(best_model.score(x_test, y_test))
-
-    best_val_acc = 0.0
-    best_params = None
-    best_model = None
     lambda_range = [0, 1e-5, 1e-4, 1e-3, 1e-2]
-    for epochs, lamb in product(range(1, 10), lambda_range):
-        print("\nnumber of epochs:",epochs, ", lambda:", lamb)
-        model, _, val_acc = run_softmax(x_train, y_train, x_val, y_val, x_val, y_val, method='cg', epochs=epochs, lamb=lamb)
-        if val_acc > best_val_acc:
-            best_val_acc = val_acc
-            best_params = {'epochs': epochs, 'lamb': lamb}
-            best_model = model
-
-    print("\nBest validation accuracy:", best_val_acc)
-    print("Best parameters:", best_params)
-    print("Trying best model on test set")
-    print(best_model.score(x_test, y_test))
-
+    best_model, best_params, best_val_acc = grid_search_softmax(x_train, y_train, x_val, y_val, 'cg', epochs_range=range(1,10), lambda_range=lambda_range)
+    print('Best parameters:', best_params)
+    print('Best validation accuracy:', best_val_acc)
+    print('Score on test set:', best_model.score(x_test, y_test))
 
 if __name__ == '__main__':
     main()

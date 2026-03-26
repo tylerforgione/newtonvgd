@@ -54,9 +54,6 @@ class SoftmaxRegression:
 
         use_batch = batch_size is not None
 
-        if use_batch and method != 'gd':
-            raise ValueError('Can\'t use batch for anything other than GD')
-
         for i in range(epochs):
             if method == 'gd':
                 if use_batch:
