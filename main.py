@@ -68,22 +68,41 @@ def evaluate_config(method, params):
     return val_acc, params, model
 
 
-def grid_search_softmax(
-        x_train, y_train, x_val, y_val,
-        method='gd',
-        epochs_range=None,
-        lr_range=None,
-        batch_size_range=None,
-        lambda_range=None,
-):
+def sample_grid_gd(num_samples):
+    params = []
+    for _ in range(num_samples):
+        epochs = np.random.choice([10, 20, 50])
+        lr = 10 ** np.random.uniform(-4, -2)
+        batch_size = np.random.choice([32, 64, 128])
+        lamb = 10 ** np.random.uniform(-5, -2)
+
+        if np.random.rand() < 0.5:
+            lamb = 0
+
+        params.append([epochs, lr, batch_size, lamb])
+
+    return params
+
+
+def sample_grid_cg(num_samples):
+    params = []
+    for _ in range(num_samples):
+        epochs = np.random.randint(1, 10)
+        lamb = 10 ** np.random.uniform(-5, -2)
+        if np.random.rand() < 0.2:
+            lamb = 0
+        params.append([epochs, [None], [None], lamb])
+
+    return params
+
+
+def grid_search_softmax(x_train, y_train, x_val, y_val, method='gd'):
     if method == 'gd':
-        param_grid = product(epochs_range, lr_range, batch_size_range, lambda_range)
+        param_list = sample_grid_gd(40)
     elif method == 'cg':
-        param_grid = product(epochs_range, [None], [None], lambda_range)
+        param_list = sample_grid_cg(15)
     else:
         raise ValueError('Unknown method')
-
-    param_list = list(param_grid)
 
     GLOBAL_DATA["x_train"] = x_train
     GLOBAL_DATA["y_train"] = y_train
@@ -116,26 +135,13 @@ def main():
 
     x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size=0.2, random_state=17)
 
-    # run the actual thing
-    # run_logreg(x_train, y_train, x_val, y_val, x_test, y_test, method='gd')
-    # run_logreg(x_train, y_train, x_val, y_val, x_test, y_test, method='newton', epochs=1)
-    # run_logreg(x_train, y_train, x_val, y_val, x_test, y_test, method='cholesky', epochs=1)
-    # run_logreg(x_train, y_train, x_val, y_val, x_test, y_test, method='cg', epochs=1)
-
     # softmax time
-    epochs_range = [10, 20, 50]
-    lr_range = [1e-4, 5e-4, 1e-3, 5e-3]
-    batch_size_range = [32, 64, 128]
-    lambda_range = [0, 1e-5, 1e-4, 1e-3, 1e-2]
-    best_model, best_params, best_val_acc = grid_search_softmax(x_train, y_train, x_val, y_val, 'gd', epochs_range,
-                                                                lr_range, batch_size_range, lambda_range)
+    best_model, best_params, best_val_acc = grid_search_softmax(x_train, y_train, x_val, y_val, 'gd')
     print('Best parameters:', best_params)
     print('Best validation accuracy:', best_val_acc)
     print('Score on test set:', best_model.score(x_test, y_test))
 
-    lambda_range = [0, 1e-5, 1e-4, 1e-3, 1e-2]
-    best_model, best_params, best_val_acc = grid_search_softmax(x_train, y_train, x_val, y_val, 'cg',
-                                                                epochs_range=range(1, 10), lambda_range=lambda_range)
+    best_model, best_params, best_val_acc = grid_search_softmax(x_train, y_train, x_val, y_val, 'cg')
     print('Best parameters:', best_params)
     print('Best validation accuracy:', best_val_acc)
     print('Score on test set:', best_model.score(x_test, y_test))
