@@ -42,7 +42,8 @@ class SoftmaxRegression:
 
         return X.T @ S / X.shape[0] + lamb * v_reg
 
-    def fit(self, X, y, X_val, y_val, method='gd', epochs=100, lr=0.1, batch_size=None, lamb=0.0):
+    def fit(self, X, y, X_val, y_val, method='gd', epochs=100, lr=0.1, batch_size=None, lamb=0.0,
+            early_stopping=True, patience=5, tolerance=1e-3):
         train_accs = []
         train_losses = []
         val_accs = []
@@ -56,6 +57,9 @@ class SoftmaxRegression:
 
         use_batch = batch_size is not None
 
+        best_val_loss = float('inf')
+        epochs_wo_imp = 0
+        best_weights = self.weights.copy()
         for i in range(epochs):
             if method == 'gd':
                 if use_batch:
@@ -99,11 +103,27 @@ class SoftmaxRegression:
 
             # validation stuff
             loss = self.loss(X_val, y_val, lamb=lamb)
+
+            if early_stopping:
+                if loss < best_val_loss - tolerance:
+                    epochs_wo_imp = 0
+                    best_val_loss = loss
+                    best_weights = self.weights.copy()
+
+                else:
+                    epochs_wo_imp += 1
+
+                if epochs_wo_imp > patience:
+                    break
+
             preds = self.predict(X_val[:, 1:])
             y_labels = np.argmax(y_val, axis=1)
             acc = np.mean(preds == y_labels)
             val_accs.append(acc)
             val_losses.append(loss)
+
+        if early_stopping:
+            self.weights = best_weights
 
         return {
             'train_accs': train_accs,

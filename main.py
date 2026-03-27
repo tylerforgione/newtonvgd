@@ -27,12 +27,13 @@ def run_logreg(x_train, y_train, x_val, y_val, x_eval, y_eval, method='gd', epoc
 
 
 def run_softmax(x_train, y_train, x_val, y_val, x_eval, y_eval, method='gd', epochs=1000, lr=0.0001, batch_size=None,
-                lamb=0.0, verbose=False):
+                lamb=0.0, verbose=False, early_stopping=True, patience=3, tolerance=1e-3):
     softmax = SoftmaxRegression()
     if verbose:
         print("Training softmax regression using", method)
     start = time.time()
-    metrics = softmax.fit(x_train, y_train, x_val, y_val, method, epochs, lr, batch_size, lamb)
+    metrics = softmax.fit(x_train, y_train, x_val, y_val, method, epochs, lr, batch_size, lamb, early_stopping,
+                          patience, tolerance)
     end = time.time() - start
     if verbose:
         print("Training time: ", end)
@@ -68,7 +69,7 @@ def evaluate_config(method, params):
 def sample_grid_gd(num_samples):
     params = []
     for _ in range(num_samples):
-        epochs = np.random.choice([10, 20, 50])
+        epochs = np.random.choice([10, 20, 50, 75])
         lr = 10 ** np.random.uniform(-4, -2)
         batch_size = np.random.choice([32, 64, 128])
         lamb = 10 ** np.random.uniform(-5, -2)
@@ -88,7 +89,7 @@ def sample_grid_cg(num_samples):
         lamb = 10 ** np.random.uniform(-5, -2)
         if np.random.rand() < 0.2:
             lamb = 0
-        params.append([epochs, [None], [None], lamb])
+        params.append([epochs, None, None, lamb])
 
     return params
 
@@ -119,18 +120,24 @@ def grid_search_softmax(x_train, y_train, x_val, y_val, method='gd'):
 
 
 def save_results(results, filename):
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+
+    results = sorted(results, key=lambda x: x[0], reverse=True)
+
     with open(filename, 'w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(['val_acc', 'epochs', 'lr', 'batch_size', 'lamb', 'time'])
+        writer.writerow(['rank', 'val_acc', 'epochs', 'lr', 'batch_size', 'lamb', 'time'])
 
-        for val_acc, params, _, train_time in results:
+        for i, (val_acc, params, _, train_time) in enumerate(results):
             epochs, lr, batch_size, lamb = params
-            writer.writerow([val_acc, epochs, lr, batch_size, lamb, train_time])
+            writer.writerow([i + 1, val_acc, epochs, lr, batch_size, lamb, train_time])
 
 
 def main():
     # main just used for data then we run the regression based on the method
     x, y = fetch_openml(name='mnist_784', version=1, return_X_y=True)
+
+    x = x.astype(np.float32)
 
     encoder = OneHotEncoder(sparse_output=False)
     y = encoder.fit_transform(y.to_numpy().reshape(-1, 1))
