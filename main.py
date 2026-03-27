@@ -119,6 +119,14 @@ def grid_search_softmax(x_train, y_train, x_val, y_val, method='gd'):
     return best_model, best_params, best_val_acc, results
 
 
+def get_gridsearch_results(x_train, y_train, x_val, y_val, x_test, y_test, method):
+    best_model, best_params, best_val_acc, results = grid_search_softmax(x_train, y_train, x_val, y_val, method)
+    save_results(results, 'output/gd.csv')
+    print('Best parameters:', best_params)
+    print('Best validation accuracy:', best_val_acc)
+    print('Score on test set:', best_model.score(x_test, y_test))
+
+
 def save_results(results, filename):
     os.makedirs(os.path.dirname(filename), exist_ok=True)
 
@@ -131,6 +139,30 @@ def save_results(results, filename):
         for i, (val_acc, params, _, train_time) in enumerate(results):
             epochs, lr, batch_size, lamb = params
             writer.writerow([i + 1, val_acc, epochs, lr, batch_size, lamb, train_time])
+
+
+def evaluate_best_config(x_train, y_train, x_val, y_val, x_test, y_test, method, best_params, runs=5):
+    result = []
+
+    os.environ["OPENBLAS_NUM_THREADS"] = "-1"
+    os.environ["OMP_NUM_THREADS"] = "-1"
+    os.environ["MKL_NUM_THREADS"] = "-1"
+
+    for i in range(runs):
+        model, _, val_acc, train_time = run_softmax(
+            x_train, y_train, x_val, y_val, x_val, y_val,
+            method=method,
+            epochs=best_params[0],
+            lr=best_params[1],
+            batch_size=best_params[2],
+            lamb=best_params[3]
+        )
+
+        test_acc = model.score(x_test, y_test)
+
+        result.append((val_acc, test_acc, train_time))
+
+    return result
 
 
 def main():
@@ -150,17 +182,21 @@ def main():
     x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size=0.2, random_state=17)
 
     # softmax time
-    best_model, best_params, best_val_acc, results = grid_search_softmax(x_train, y_train, x_val, y_val, 'gd')
-    save_results(results, 'output/gd.csv')
-    print('Best parameters:', best_params)
-    print('Best validation accuracy:', best_val_acc)
-    print('Score on test set:', best_model.score(x_test, y_test))
+    # get_gridsearch_results(x_train, y_train, x_val, y_val, x_test, y_test, method='gd')
+    # get_gridsearch_results(x_train, y_train, x_val, y_val, x_test, y_test, method='cg')
 
-    best_model, best_params, best_val_acc, results = grid_search_softmax(x_train, y_train, x_val, y_val, 'cg')
-    save_results(results, 'output/cg.csv')
-    print('Best parameters:', best_params)
-    print('Best validation accuracy:', best_val_acc)
-    print('Score on test set:', best_model.score(x_test, y_test))
+    # now run best
+    best_params = (50, 0.00966829572656517, 32, 0)
+    results = evaluate_best_config(x_train, y_train, x_val, y_val, x_test, y_test, method='gd', best_params=best_params)
+    print(results)
+
+    best_params = (6, None, None, 6.067738140370665e-05)
+    results = evaluate_best_config(x_train, y_train, x_val, y_val, x_test, y_test, method='cg', best_params=best_params)
+    print(results)
+
+    best_params = (4, None, None, 0.0003103996573489349)
+    results = evaluate_best_config(x_train, y_train, x_val, y_val, x_test, y_test, method='cg', best_params=best_params)
+    print(results)
 
 
 if __name__ == '__main__':
