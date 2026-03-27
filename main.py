@@ -188,15 +188,15 @@ def main():
     # now run best
     best_params = (50, 0.00966829572656517, 32, 0)
     results = evaluate_best_config(x_train, y_train, x_val, y_val, x_test, y_test, method='gd', best_params=best_params)
-    print(results)
+    print(tuple(sum(col) / len(col) for col in zip(*results)))
 
     best_params = (6, None, None, 6.067738140370665e-05)
     results = evaluate_best_config(x_train, y_train, x_val, y_val, x_test, y_test, method='cg', best_params=best_params)
-    print(results)
+    print(tuple(sum(col) / len(col) for col in zip(*results)))
 
     best_params = (4, None, None, 0.0003103996573489349)
     results = evaluate_best_config(x_train, y_train, x_val, y_val, x_test, y_test, method='cg', best_params=best_params)
-    print(results)
+    print(tuple(sum(col) / len(col) for col in zip(*results)))
 
 
 if __name__ == '__main__':
