@@ -113,7 +113,7 @@ class SoftmaxRegression:
                 else:
                     epochs_wo_imp += 1
 
-                if epochs_wo_imp > patience:
+                if epochs_wo_imp >= patience:
                     break
 
             preds = self.predict(X_val[:, 1:])
