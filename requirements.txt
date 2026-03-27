@@ -3,3 +3,5 @@ pandas
 scipy
 scipy-stubs
 scikit-learn
+tqdm
+joblib

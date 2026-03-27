@@ -1,15 +1,12 @@
-from pickle import GLOBAL
-
-import pandas as pd
+import csv
 import numpy as np
 from sklearn.model_selection import train_test_split
 from sklearn.datasets import fetch_openml
 from logisticregression import LogisticRegression
 from softmax import SoftmaxRegression
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.preprocessing import OneHotEncoder
 import time
-from itertools import product
-from joblib import Parallel, delayed, parallel_backend
+from joblib import Parallel, delayed
 import os
 from tqdm import tqdm
 
@@ -23,10 +20,10 @@ def run_logreg(x_train, y_train, x_val, y_val, x_eval, y_eval, method='gd', epoc
     print("Training logistic regression using", method)
     start = time.time()
     metrics = logreg.fit(x_train, y_train, x_val, y_val, method, epochs, lr, batch_size)
-    end = time.time()
-    print("Training time: ", end - start)
+    end = time.time() - start
+    print("Training time: ", end)
     print("Val accuracy: ", logreg.score(x_eval, y_eval))
-    return logreg, metrics, logreg.score(x_eval, y_eval)
+    return logreg, metrics, logreg.score(x_eval, y_eval), end
 
 
 def run_softmax(x_train, y_train, x_val, y_val, x_eval, y_eval, method='gd', epochs=1000, lr=0.0001, batch_size=None,
@@ -36,13 +33,13 @@ def run_softmax(x_train, y_train, x_val, y_val, x_eval, y_eval, method='gd', epo
         print("Training softmax regression using", method)
     start = time.time()
     metrics = softmax.fit(x_train, y_train, x_val, y_val, method, epochs, lr, batch_size, lamb)
-    end = time.time()
+    end = time.time() - start
     if verbose:
-        print("Training time: ", end - start)
+        print("Training time: ", end)
     acc = softmax.score(x_eval, y_eval)
     if verbose:
         print("Validation accuracy: ", acc)
-    return softmax, metrics, acc
+    return softmax, metrics, acc, end
 
 
 GLOBAL_DATA = {}
@@ -56,7 +53,7 @@ def evaluate_config(method, params):
 
     epochs, lr, batch_size, lamb = params
 
-    model, _, val_acc = run_softmax(
+    model, _, val_acc, train_time = run_softmax(
         x_train, y_train, x_val, y_val, x_val, y_val,
         method=method,
         epochs=epochs,
@@ -65,7 +62,7 @@ def evaluate_config(method, params):
         lamb=lamb
     )
 
-    return val_acc, params, model
+    return val_acc, params, model, train_time
 
 
 def sample_grid_gd(num_samples):
@@ -116,9 +113,19 @@ def grid_search_softmax(x_train, y_train, x_val, y_val, method='gd'):
         for param in tqdm(param_list)
     )
 
-    best_val_acc, best_params, best_model = max(results, key=lambda x: x[0])
+    best_val_acc, best_params, best_model, _ = max(results, key=lambda x: x[0])
 
-    return best_model, best_params, best_val_acc
+    return best_model, best_params, best_val_acc, results
+
+
+def save_results(results, filename):
+    with open(filename, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['val_acc', 'epochs', 'lr', 'batch_size', 'lamb', 'time'])
+
+        for val_acc, params, _, train_time in results:
+            epochs, lr, batch_size, lamb = params
+            writer.writerow([val_acc, epochs, lr, batch_size, lamb, train_time])
 
 
 def main():
@@ -136,12 +143,14 @@ def main():
     x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size=0.2, random_state=17)
 
     # softmax time
-    best_model, best_params, best_val_acc = grid_search_softmax(x_train, y_train, x_val, y_val, 'gd')
+    best_model, best_params, best_val_acc, results = grid_search_softmax(x_train, y_train, x_val, y_val, 'gd')
+    save_results(results, 'output/gd.csv')
     print('Best parameters:', best_params)
     print('Best validation accuracy:', best_val_acc)
     print('Score on test set:', best_model.score(x_test, y_test))
 
-    best_model, best_params, best_val_acc = grid_search_softmax(x_train, y_train, x_val, y_val, 'cg')
+    best_model, best_params, best_val_acc, results = grid_search_softmax(x_train, y_train, x_val, y_val, 'cg')
+    save_results(results, 'output/cg.csv')
     print('Best parameters:', best_params)
     print('Best validation accuracy:', best_val_acc)
     print('Score on test set:', best_model.score(x_test, y_test))
