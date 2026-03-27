@@ -86,8 +86,8 @@ class SoftmaxRegression:
                 step, info = sp.sparse.linalg.cg(H_op, grad_flat, maxiter=50)
                 step = step.reshape(d, K)
                 self.weights -= step
-                if info > 0:
-                    print("CG did not fully converge:", info)
+                # if info > 0:
+                #     print("CG did not fully converge:", info)
 
             # training stuff
             loss = self.loss(X, y, lamb=lamb)

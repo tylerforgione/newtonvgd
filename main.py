@@ -1,3 +1,5 @@
+from pickle import GLOBAL
+
 import pandas as pd
 import numpy as np
 from sklearn.model_selection import train_test_split
@@ -7,6 +9,13 @@ from softmax import SoftmaxRegression
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 import time
 from itertools import product
+from joblib import Parallel, delayed, parallel_backend
+import os
+from tqdm import tqdm
+
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
 
 
 def run_logreg(x_train, y_train, x_val, y_val, x_eval, y_eval, method='gd', epochs=1000, lr=0.0001, batch_size=None):
@@ -21,16 +30,42 @@ def run_logreg(x_train, y_train, x_val, y_val, x_eval, y_eval, method='gd', epoc
 
 
 def run_softmax(x_train, y_train, x_val, y_val, x_eval, y_eval, method='gd', epochs=1000, lr=0.0001, batch_size=None,
-                lamb=0.0):
+                lamb=0.0, verbose=False):
     softmax = SoftmaxRegression()
-    print("Training softmax regression using", method)
+    if verbose:
+        print("Training softmax regression using", method)
     start = time.time()
     metrics = softmax.fit(x_train, y_train, x_val, y_val, method, epochs, lr, batch_size, lamb)
     end = time.time()
-    print("Training time: ", end - start)
+    if verbose:
+        print("Training time: ", end - start)
     acc = softmax.score(x_eval, y_eval)
-    print("Val accuracy: ", acc)
+    if verbose:
+        print("Validation accuracy: ", acc)
     return softmax, metrics, acc
+
+
+GLOBAL_DATA = {}
+
+
+def evaluate_config(method, params):
+    x_train = GLOBAL_DATA["x_train"]
+    y_train = GLOBAL_DATA["y_train"]
+    x_val = GLOBAL_DATA["x_val"]
+    y_val = GLOBAL_DATA["y_val"]
+
+    epochs, lr, batch_size, lamb = params
+
+    model, _, val_acc = run_softmax(
+        x_train, y_train, x_val, y_val, x_val, y_val,
+        method=method,
+        epochs=epochs,
+        lr=lr,
+        batch_size=batch_size,
+        lamb=lamb
+    )
+
+    return val_acc, params, model
 
 
 def grid_search_softmax(
@@ -41,10 +76,6 @@ def grid_search_softmax(
         batch_size_range=None,
         lambda_range=None,
 ):
-    best_val_acc = 0.0
-    best_params = None
-    best_model = None
-
     if method == 'gd':
         param_grid = product(epochs_range, lr_range, batch_size_range, lambda_range)
     elif method == 'cg':
@@ -52,36 +83,21 @@ def grid_search_softmax(
     else:
         raise ValueError('Unknown method')
 
-    for epochs, lr, batch_size, lamb in param_grid:
-        if method == 'gd':
-            print(f"epochs={epochs}, lr={lr}, batch={batch_size}, lambda={lamb}")
-        elif method == 'cg':
-            print(f"epochs={epochs}, lambda={lamb}")
+    param_list = list(param_grid)
 
-        model, _, val_acc = run_softmax(
-            x_train, y_train, x_val, y_val, x_val, y_val,
-            method=method,
-            epochs=epochs,
-            lr=lr,
-            batch_size=batch_size,
-            lamb=lamb
+    GLOBAL_DATA["x_train"] = x_train
+    GLOBAL_DATA["y_train"] = y_train
+    GLOBAL_DATA["x_val"] = x_val
+    GLOBAL_DATA["y_val"] = y_val
+
+    results = Parallel(n_jobs=4)(
+        delayed(evaluate_config)(
+            method, param
         )
+        for param in tqdm(param_list)
+    )
 
-        if val_acc > best_val_acc:
-            best_val_acc = val_acc
-            if method == 'gd':
-                best_params = {
-                    'epochs': epochs,
-                    'lr': lr,
-                    'batch_size': batch_size,
-                    'lamb': lamb
-                }
-            elif method == 'cg':
-                best_params = {
-                    'epochs': epochs,
-                    'lamb': lamb
-                }
-            best_model = model
+    best_val_acc, best_params, best_model = max(results, key=lambda x: x[0])
 
     return best_model, best_params, best_val_acc
 
